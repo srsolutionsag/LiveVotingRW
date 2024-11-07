@@ -251,68 +251,89 @@ var xlvoPlayer = {
 			clearTimeout(xlvoPlayer.timeout);
 		}
 	},
-	getPlayerData: function () {
+	getPlayerData() {
 		if (xlvoPlayer.isRequestPending()) {
 			xlvoPlayer.log('Pause getPlayerData due to running POST');
 			return;
 		}
 		xlvoPlayer.startRequest();
-		$.get(xlvoPlayer.config.base_url, {cmd: 'getPlayerData'}).done(function (data) {
-			xlvoPlayer.counter++;
+		$.get(xlvoPlayer.config.base_url, { cmd: 'getPlayerData' })
+			.done((data) => {
+				xlvoPlayer.counter++;
 
-			if ((xlvoPlayer.counter > xlvoPlayer.forced_update_interval) // Forced update of HTML
-				|| (data.player.last_update !== xlvoPlayer.player.last_update) // Player is out of sync
-				|| (data.player.show_results !== xlvoPlayer.player.show_results) // Show Results has changed
-				|| (data.player.status !== xlvoPlayer.player.status) // player status has changed
-				|| (data.player.active_voting_id !== xlvoPlayer.player.active_voting_id) //Voting has changed
-				|| xlvoPlayer.player.has_countdown) // countdown is running
-			{
+				if (
+					xlvoPlayer.counter > xlvoPlayer.forced_update_interval || // Forced update of HTML
+					data.player.last_update !== xlvoPlayer.player.last_update || // Player is out of sync
+					data.player.show_results !== xlvoPlayer.player.show_results || // Show Results has changed
+					data.player.status !== xlvoPlayer.player.status || // Player status has changed
+					data.player.active_voting_id !== xlvoPlayer.player.active_voting_id || // Voting has changed
+					xlvoPlayer.player.has_countdown // countdown is running
+				) {
+					const $newContent = $(data.player_html);
 
-				var playerHtml = data.player_html;
-				if (xlvoPlayer.player_html !== null && xlvoPlayer.player_html !== playerHtml) { // Only change html if changed (Try prevent blinking images) (Not work because countdown text and/or token links)
-					//create new jquery node
-					var node = $(playerHtml);
-					//get list of old childs
-					var oldNode = $('#xlvo-display-player').children();
+					// Extract and update only specific sections
+					const newHeading = $newContent.find('.panel-heading');
+					const newQuestion = $newContent.find('.xlvo-question');
+					const newVotes = $newContent.find('#xlvo-votes');
+					const newAttendees = $newContent.find('#xlvo-attendees');
+					const newResults = $newContent.find('#xlvo-display-results');
+					const rowOptions = $newContent.find('#xlvo-display-options');
 
-					//append new child
-					$('#xlvo-display-player').append(node);
+					// Update only if the content has changed
+					if($('.panel-heading').html() !== newHeading.html()) {
+						$('.panel-heading').html(newHeading.html());
+					}
 
-					//fade out old child and remove child afterwards
-					oldNode.fadeOut(200, function () {
-						oldNode.remove();
-					}.bind(oldNode));
+					if ($('#xlvo-votes').html() !== newVotes.html()) {
+						$('#xlvo-votes').html(newVotes.html());
+					}
+
+					if ($('#xlvo-attendees').html() !== newAttendees.html()) {
+						$('#xlvo-attendees').html(newAttendees.html());
+					}
+
+					if ($('#xlvo-display-options').html() !== rowOptions.html()) {
+						$('#xlvo-display-options').html(rowOptions.html());
+						$(".xlvo-question").html(newQuestion.html());
+					}
+
+					if ($('#xlvo-display-results').html() !== newResults.html()) {
+						$('#xlvo-display-results').html(newResults.html());
+					}
+
 
 
 					if (xlvoPlayer.config.use_mathjax && !!MathJax) {
-						if ((MathJax.version.charAt(0) === '3')) {
+						if (MathJax.version.charAt(0) === '3') {
 							MathJax.typeset('xlvo_voter_player');
 						} else {
 							MathJax.Hub.Config(xlvoPlayer.mathjax_config);
-							MathJax.Hub.Queue(
-								["Typeset", MathJax.Hub, 'xlvo-display-player']
-							);
+							MathJax.Hub.Queue([
+								'Typeset',
+								MathJax.Hub,
+								'xlvo-display-player',
+							]);
 						}
 					}
 
 					xlvoPlayer.counter = 0;
 					xlvoPlayer.buttons_handled = false;
 				}
-			}
-			xlvoPlayer.player = data.player;
-			xlvoPlayer.player_html = data.player_html;
-			xlvoPlayer.handleQuestionButtons(data.buttons_html);
-			xlvoPlayer.initElements();
 
+				xlvoPlayer.player = data.player;
+				xlvoPlayer.player_html = data.player_html;
+				xlvoPlayer.handleQuestionButtons(data.buttons_html);
+				xlvoPlayer.initElements();
 
-			xlvoPlayer.timeout = setTimeout(xlvoPlayer.getPlayerData, xlvoPlayer.delay);
-
-
-		}).always(function () {
-			xlvoPlayer.endRequest();
-		});
+				xlvoPlayer.timeout = setTimeout(
+					xlvoPlayer.getPlayerData,
+					xlvoPlayer.delay,
+				);
+			})
+			.always(() => {
+				xlvoPlayer.endRequest();
+			});
 	},
-
 
 	handleSwitch: function () {
 		xlvoPlayer.buttons_handled = false;
